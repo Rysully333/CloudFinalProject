@@ -25,22 +25,22 @@ const FriendManagement = () => {
   };
 
   // Fetch or subscribe to user data
-useEffect(() => {
-  if (currentUser) {
-      const userRef = doc(firestore, 'users', currentUser.uid);
+  useEffect(() => {
+    if (currentUser) {
+        const userRef = doc(firestore, 'users', currentUser.uid);
 
-      // Subscribe to changes in the user's friends list
-      const unsubscribe = onSnapshot(userRef, (docSnap) => {
-          if (docSnap.exists()) {
-              const data = docSnap.data();
-              setFriendRequests(data.friendRequests || []);
-              setFriends(data.friends || []); // Ensure this updates only here
-          }
-      });
+        // Subscribe to changes in the user's friends list
+        const unsubscribe = onSnapshot(userRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                setFriendRequests(data.friendRequests || []);
+                setFriends(data.friends || []); // Ensure this updates only here
+            }
+        });
 
-      return () => unsubscribe();
-  }
-}, [currentUser]);
+        return () => unsubscribe();
+    }
+  }, [currentUser]);
   
   // Fetch details for each friend
   useEffect(() => {

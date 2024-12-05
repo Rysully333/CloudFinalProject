@@ -1,11 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { firestore } from '../firebase';
-import { collection, onSnapshot, query, where, updateDoc, doc, getDocs, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, updateDoc, doc, getDocs, deleteDoc, getDoc } from 'firebase/firestore';
 import { Card, CardContent, Typography, LinearProgress, Box } from '@mui/material';
+
+import { useAuth } from '../contexts/AuthContext';
+
+import Dropdown from './Dropdown';
 
 const Dashboard = () => {
   const [diningHalls, setDiningHalls] = useState([]);
   const [checkIns, setCheckIns] = useState([]);
+
+  const { currentUser } = useAuth();
+  const [friendsMap, setFriendsMap] = useState({});
+
+  const diningHallMap = {
+    commons: "Commons Dining Center",
+    rand: "Rand Dining Center",
+    kissam: "Kissam Kitchen",
+    e_bronson_ingram: "E. Bronson Ingram Dining Hall",
+    zeppos: "Nicholas S. Zeppos Dining Hall",
+    rothschild: "Rothschild Dining Hall",
+    carmichael: "Cafe Carmichael",
+    pub: "The Pub at Overcup Oak",
+    blenz: "Vandy Blenz"
+  };
 
   // Fetch dining hall data
   useEffect(() => {
@@ -19,6 +38,61 @@ const Dashboard = () => {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+  
+    // Subscribe to changes in the current user's friends list
+    const userRef = doc(firestore, 'users', currentUser.uid);
+    const unsubscribe = onSnapshot(userRef, async (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const friends = data.friends || []; // Default to empty array if no friends
+  
+        // Fetch details for each friend and build the map
+        const detailsPromises = friends.map(async (friendUid) => {
+          const friendRef = doc(firestore, 'users', friendUid);
+          const friendSnap = await getDoc(friendRef);
+  
+          if (friendSnap.exists()) {
+            const friendData = friendSnap.data();
+            return { 
+              location: friendData.currentLocation, 
+              name: friendData.name 
+            };
+          } else {
+            console.error(`Friend document does not exist: ${friendUid}`);
+            return null;
+          }
+        });
+  
+        const details = await Promise.all(detailsPromises);
+  
+        // Transform the details into a map of locationName -> friendName
+        const newFriendsMap = {};
+        details.filter((detail) => detail !== null).forEach(({ location, name }) => {
+          const fullLocation = diningHallMap[location];
+          if (fullLocation) {
+            // Append to the map (can handle multiple friends at the same fullLocation)
+            if (!newFriendsMap[fullLocation]) {
+              newFriendsMap[fullLocation] = [];
+            }
+            newFriendsMap[fullLocation].push(name);
+          }
+        });
+  
+        console.log("Current friends map: ", friendsMap);
+        setFriendsMap(newFriendsMap);
+        console.log("New friends map: ", newFriendsMap);
+      }
+    });
+  
+    return () => unsubscribe();
+  }, [currentUser]);
+  
+  useEffect(() => {
+    console.log("Updated friendsMap: ", friendsMap);
+  }, [friendsMap]);
 
   // Fetch location reports and update dining halls every hour
   useEffect(() => {
@@ -94,6 +168,10 @@ const Dashboard = () => {
                   <Typography variant="body2" sx={{ color: 'primary' }}>
                     {occupancyPercentage}% Full
                   </Typography>
+                  <Dropdown
+                    friends={friendsMap[hall.name] || []}
+                    locationName={hall.name}
+                  />
                 </CardContent>
               </Card>
             </Box>
