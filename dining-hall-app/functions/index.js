@@ -19,7 +19,7 @@ exports.scheduledCheckOut = functions.pubsub.schedule("every 1 hours")
 
         const batch = firestore.batch();
 
-        expiredReports.forEach(async (doc) => {
+        expiredReports.forEach((doc) => {
           const diningHallId = doc.data().diningHall;
           const userEmail = doc.data().userEmail;
 
@@ -30,17 +30,17 @@ exports.scheduledCheckOut = functions.pubsub.schedule("every 1 hours")
             occupancy: admin.firestore.FieldValue.increment(-1),
           });
 
-          // Update user's current location to "none"
-          const userQuery = firestore.collection("users").where("email", "==", userEmail);
-          const userSnapshot = await userQuery.get();
-          if (!userSnapshot.empty) {
-              const userDocRef = userSnapshot.docs[0].ref;
-              batch.update(userDocRef, {
-                  currentLocation: "none",
-              });
-          } else {
-              console.error("User not found with the given email");
-          }
+          // // Update user's current location to "none"
+          // const userQuery = firestore.collection("users").where("email", "==", userEmail);
+          // const userSnapshot = await userQuery.get();
+          // if (!userSnapshot.empty) {
+          //     const userDocRef = userSnapshot.docs[0].ref;
+          //     batch.update(userDocRef, {
+          //         currentLocation: "none",
+          //     });
+          // } else {
+          //     console.error("User not found with the given email");
+          // }
           
           // Delete the expired check-in
           batch.delete(doc.ref);
