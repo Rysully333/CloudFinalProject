@@ -72,7 +72,7 @@ const Login = () => {
         width: 400,
         textAlign: 'center',
         }}
->
+    >
     <Typography variant="h4" gutterBottom>Login</Typography>
     {error && <Typography color="error" variant="body2" sx={{mb: 2}}>{error}</Typography>}
     <Box component="form" onSubmit={handleSubmit} sx={{ mb: 2 }}>
