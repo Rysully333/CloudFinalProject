@@ -17,18 +17,18 @@ exports.scheduledCheckOut = functions.pubsub.schedule("every 1 hours")
             .where("timestamp", "<=", oneHourAgo)
             .get();
 
-        const batch = firestore.batch();
+        // const batch = firestore.batch();
 
-        expiredReports.forEach((doc) => {
-          const diningHallId = doc.data().diningHall;
-          const userEmail = doc.data().userEmail;
+        // expiredReports.forEach((doc) => {
+        //   const diningHallId = doc.data().diningHall;
+        //   const userEmail = doc.data().userEmail;
 
-          // Decrement occupancy for the respective dining hall
-          const diningHallRef = firestore.collection("diningHalls")
-              .doc(diningHallId);
-          batch.update(diningHallRef, {
-            occupancy: admin.firestore.FieldValue.increment(-1),
-          });
+        //   // Decrement occupancy for the respective dining hall
+        //   const diningHallRef = firestore.collection("diningHalls")
+        //       .doc(diningHallId);
+        //   batch.update(diningHallRef, {
+        //     occupancy: admin.firestore.FieldValue.increment(-1),
+        //   });
 
           // // Update user's current location to "none"
           // const userQuery = firestore.collection("users").where("email", "==", userEmail);
@@ -43,10 +43,10 @@ exports.scheduledCheckOut = functions.pubsub.schedule("every 1 hours")
           // }
           
           // Delete the expired check-in
-          batch.delete(doc.ref);
-        });
+        //   batch.delete(doc.ref);
+        // });
 
-        await batch.commit();
+        // await batch.commit();
         console.log(`${expiredReports.size} expired check-ins removed.`);
       } catch (error) {
         console.error("Error during scheduled checkout:", error);
