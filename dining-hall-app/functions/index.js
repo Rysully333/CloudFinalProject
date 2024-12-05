@@ -21,12 +21,20 @@ exports.scheduledCheckOut = functions.pubsub.schedule("every 1 hours")
 
         expiredReports.forEach((doc) => {
           const diningHallId = doc.data().diningHall;
+          const userEmail = doc.data().userEmail;
 
           // Decrement occupancy for the respective dining hall
           const diningHallRef = firestore.collection("diningHalls")
               .doc(diningHallId);
           batch.update(diningHallRef, {
             occupancy: admin.firestore.FieldValue.increment(-1),
+          });
+
+          // Update user's current location to "none"
+          const userRef = firestore.collection("users")
+              .where("email", "==", userEmail);
+          batch.update(userRef, {
+            currentLocation: "none",
           });
 
           // Delete the expired check-in

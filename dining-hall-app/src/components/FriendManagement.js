@@ -12,47 +12,35 @@ const FriendManagement = () => {
   const [friendRequests, setFriendRequests] = useState([]);
   const [friendDetails, setFriendDetails] = useState([]);
 
-  // fetch friend requests and friends from Firestore
-  useEffect(() => {
-    if (currentUser) {
-      const userRef = doc(firestore, 'users', currentUser.uid);
-      getDoc(userRef).then((docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setFriendRequests(data.friendRequests || []);
-          setFriends(data.friends || []);
-        }
-      });
+  const diningHallMap = {
+    commons: "Commons Dining Center",
+    rand: "Rand Dining Center",
+    kissam: "Kissam Kitchen",
+    e_bronson_ingram: "E. Bronson Ingram Dining Hall",
+    zeppos: "Nicholas S. Zeppos Dining Hall",
+    rothschild: "Rothschild Dining Hall",
+    carmichael: "Cafe Carmichael",
+    pub: "The Pub at Overcup Oak",
+    blenz: "Vandy Blenz"
+  };
 
-      const unsubscribe = onSnapshot(collection(firestore, 'users', currentUser.uid, 'friends'), snapshot => {
-        const friendsList = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setFriends(friendsList);
+  // Fetch or subscribe to user data
+useEffect(() => {
+  if (currentUser) {
+      const userRef = doc(firestore, 'users', currentUser.uid);
+
+      // Subscribe to changes in the user's friends list
+      const unsubscribe = onSnapshot(userRef, (docSnap) => {
+          if (docSnap.exists()) {
+              const data = docSnap.data();
+              setFriendRequests(data.friendRequests || []);
+              setFriends(data.friends || []); // Ensure this updates only here
+          }
       });
 
       return () => unsubscribe();
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
-    if (currentUser) {
-      const fetchFriends = async () => {
-        const userRef = doc(firestore, 'users', currentUser.uid);
-        const unsubscribe = onSnapshot(userRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            setFriends(data.friends || []);
-          }
-        });
-  
-        return () => unsubscribe();
-      };
-  
-      fetchFriends();
-    }
-  }, [currentUser]);
+  }
+}, [currentUser]);
   
   // Fetch details for each friend
   useEffect(() => {
@@ -267,7 +255,13 @@ const FriendManagement = () => {
             <ListItem key={friendId.uid}>
               <ListItemText 
                 primary={friendId.name || 'Unknown'}
-                secondary={friendId.email}/>
+                secondary={
+                  <div>
+                    <span>Email: {friendId.email}</span>
+                    <br />
+                    <span>Location: {friendId.currentLocation ? diningHallMap[friendId.currentLocation] : "none"}</span>
+                  </div>
+                }/>
             </ListItem>
           ))}
       </List>
