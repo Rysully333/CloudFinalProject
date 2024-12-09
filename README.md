@@ -1,4 +1,4 @@
-# CloudFinalProject
+# Campus Dining Hall Tracker
 
 This project focuses on creating a dining hall web-application to allow students to monitor dining hall occupancies in real-time.
 
