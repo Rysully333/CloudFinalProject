@@ -1,5 +1,7 @@
 # Campus Dining Hall Tracker
 
+Deployed Application: https://dining-hall-app.vercel.app/
+
 This project focuses on creating a dining hall web-application to allow students to monitor dining hall occupancies in real-time.
 
 Login/Sign Up: Users can log in with site-credentials or with Google.
