@@ -2,15 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { firestore } from '../firebase';
 import { collection, onSnapshot, query, where, updateDoc, doc, getDocs, deleteDoc, getDoc } from 'firebase/firestore';
 import { Card, CardContent, Typography, LinearProgress, Box } from '@mui/material';
-
 import { useAuth } from '../contexts/AuthContext';
-
 import Dropdown from './Dropdown';
 
 const Dashboard = () => {
   const [diningHalls, setDiningHalls] = useState([]);
-  const [checkIns, setCheckIns] = useState([]);
-
   const { currentUser } = useAuth();
   const [friendsMap, setFriendsMap] = useState({});
 
@@ -42,38 +38,31 @@ const Dashboard = () => {
   useEffect(() => {
     if (!currentUser) return;
   
-    // Subscribe to changes in the current user's friends list
+    // Fetch user's friends and their locations
     const userRef = doc(firestore, 'users', currentUser.uid);
     const unsubscribe = onSnapshot(userRef, async (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        const friends = data.friends || []; // Default to empty array if no friends
+        const friends = data.friends || [];
   
-        // Fetch details for each friend and build the map
         const detailsPromises = friends.map(async (friendUid) => {
           const friendRef = doc(firestore, 'users', friendUid);
           const friendSnap = await getDoc(friendRef);
-  
           if (friendSnap.exists()) {
             const friendData = friendSnap.data();
             return { 
               location: friendData.currentLocation, 
               name: friendData.name 
             };
-          } else {
-            console.error(`Friend document does not exist: ${friendUid}`);
-            return null;
           }
+          return null;
         });
   
         const details = await Promise.all(detailsPromises);
-  
-        // Transform the details into a map of locationName -> friendName
         const newFriendsMap = {};
-        details.filter((detail) => detail !== null).forEach(({ location, name }) => {
+        details.filter(Boolean).forEach(({ location, name }) => {
           const fullLocation = diningHallMap[location];
           if (fullLocation) {
-            // Append to the map (can handle multiple friends at the same fullLocation)
             if (!newFriendsMap[fullLocation]) {
               newFriendsMap[fullLocation] = [];
             }
@@ -81,56 +70,61 @@ const Dashboard = () => {
           }
         });
   
-        console.log("Current friends map: ", friendsMap);
         setFriendsMap(newFriendsMap);
-        console.log("New friends map: ", newFriendsMap);
       }
     });
   
     return () => unsubscribe();
   }, [currentUser]);
-  
-  useEffect(() => {
-    console.log("Updated friendsMap: ", friendsMap);
-  }, [friendsMap]);
 
-  // Fetch location reports and update dining halls every hour
+  // Update dining halls and clean up old reports
   useEffect(() => {
     const interval = setInterval(async () => {
       const now = new Date();
-      const oneHourAgo = new Date(now - 60 * 60 * 1000); // 1 hour ago
-      const checkInRef = collection(firestore, 'locationReports');
-      const q = query(checkInRef, where('timestamp', '>=', oneHourAgo));
+      const oneHourAgo = new Date(now - 60 * 60 * 1000);
+      const reportsRef = collection(firestore, 'locationReports');
+      const q = query(reportsRef, where('timestamp', '>=', oneHourAgo));
       const snapshot = await getDocs(q);
+
+      // Update dining hall occupancy
       const reports = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setCheckIns(reports);
-
-      // Update dining halls occupancy based on the reports from the last hour
-      diningHalls.forEach(async (hall) => {
-        // Get all reports for this dining hall in the last hour
-        console.log(hall.id)
+      const updatedHalls = diningHalls.map((hall) => {
         const filteredReports = reports.filter(report => report.diningHall === hall.id);
-        const occupancyCount = filteredReports.length; // Count of reports in the last hour
+        return {
+          ...hall,
+          occupancy: filteredReports.length,
+        };
+      });
 
-        const diningHallRef = doc(firestore, 'diningHalls', hall.id);
+      setDiningHalls(updatedHalls);
 
-        // Update the dining hall's occupancy to the count of reports
-        await updateDoc(diningHallRef, {
-          occupancy: occupancyCount,
+      // Update user locations or set to null if no reports in the last hour
+      const userReports = {};
+      reports.forEach(report => {
+        userReports[report.userEmail] = report.diningHall;
+      });
+
+      const userSnapshot = await getDocs(collection(firestore, 'users'));
+      userSnapshot.forEach(async (userDoc) => {
+        const userData = userDoc.data();
+        const lastLocation = userReports[userData.email] || null;
+        await updateDoc(doc(firestore, 'users', userDoc.id), {
+          currentLocation: lastLocation,
         });
       });
 
-      // Optionally, remove expired location reports
-      reports.forEach(async (report) => {
-        const checkInTimestamp = report.timestamp.toDate();
-        if (checkInTimestamp < oneHourAgo) {
-          await deleteDoc(doc(firestore, 'locationReports', report.id)); // Remove expired report
+      // Delete expired reports
+      const allReports = await getDocs(reportsRef);
+      allReports.forEach(async (docSnap) => {
+        const timestamp = docSnap.data().timestamp.toDate();
+        if (timestamp < oneHourAgo) {
+          await deleteDoc(doc(firestore, 'locationReports', docSnap.id));
         }
       });
-    }, 60000); // check every minute
+    }, 60000);
 
     return () => clearInterval(interval);
-  }, [diningHalls]); // Re-run when diningHalls changes
+  }, [diningHalls]);
 
   const getOccupancyColor = (occupancy) => {
     if (occupancy <= 40) return '#3A8D15';
@@ -183,4 +177,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-

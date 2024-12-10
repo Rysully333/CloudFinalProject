@@ -1,143 +1,125 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { firestore } from '../firebase';
-import { collection, addDoc, doc, setDoc, getDoc, updateDoc, increment } from 'firebase/firestore';
-import { Box, Typography, Select, MenuItem, Button, FormControl, InputLabel } from '@mui/material';
+import { collection, addDoc, doc, updateDoc, increment } from 'firebase/firestore';
+import {
+  Box,
+  Typography,
+  Select,
+  MenuItem,
+  Button,
+  FormControl,
+  InputLabel,
+  Paper,
+  Alert,
+} from '@mui/material';
 
 const LocationReporting = () => {
   const { currentUser } = useAuth();
   const [selectedDiningHall, setSelectedDiningHall] = useState('');
-  const [diningHalls1] = useState([
-    'Rand',
-    'Commons',
-    'E. Bronson Ingram',
-    'Nicholas S. Zeppos',
-    'Rothschild',
-    'The Pub',
-    'Kissam',
-    'Cafe Carmichael',
-    'Vandy Blenz'
-  ]);
+  const [confirmationMessage, setConfirmationMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+
   const diningHalls = [
     { id: 'commons', name: 'Commons Dining Center' },
     { id: 'rand', name: 'Rand Dining Center' },
     { id: 'kissam', name: 'Kissam Kitchen' },
     { id: 'e_bronson_ingram', name: 'E. Bronson Ingram Dining Hall' },
     { id: 'zeppos', name: 'Nicholas S. Zeppos Dining Hall' },
-    { id: 'rothschild', name: 'Rothschild Dining Hall'},
-    { id: 'carmichael', name: 'Cafe Carmichael'},
-    { id: 'pub', name: 'The Pub at Overcup Oak'},
-    { id: 'blenz', name: 'Vandy Blenz'}
+    { id: 'rothschild', name: 'Rothschild Dining Hall' },
+    { id: 'carmichael', name: 'Cafe Carmichael' },
+    { id: 'pub', name: 'The Pub at Overcup Oak' },
+    { id: 'blenz', name: 'Vandy Blenz' },
   ];
-  const [confirmationMessage, setConfirmationMessage] = useState('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
+    setConfirmationMessage('');
+    setErrorMessage('');
 
-    if (!selectedDiningHall) {
-        setConfirmationMessage("Please select a dining hall before reporting a location.");
-        return;
+    if (!selectedDiningHall || !currentUser) {
+      setErrorMessage('Please select a dining hall.');
+      return;
     }
-    const timestamp = new Date();
+
     try {
-        if (currentUser && selectedDiningHall) {
-        await addDoc(collection(firestore, 'locationReports'), {
-            userEmail: currentUser.email,
-            userName: currentUser.displayName || 'Anonymous',
-            diningHall: selectedDiningHall,
-            timestamp: timestamp
-        });
+      const timestamp = new Date();
+      await addDoc(collection(firestore, 'locationReports'), {
+        userEmail: currentUser.email,
+        userName: currentUser.displayName || 'Anonymous',
+        diningHall: selectedDiningHall,
+        timestamp,
+      });
 
-        // Update user's current location
-        const userRef = doc(firestore, 'users', currentUser.uid);
-        await setDoc(
-            userRef, 
-            {
-                currentLocation: selectedDiningHall
-            },
-            {merge: true}
-        );
+      await updateDoc(doc(firestore, 'users', currentUser.uid), {
+        currentLocation: selectedDiningHall,
+      });
 
-        // Update dining hall occupancy (this is a simplified version)
-        const diningHallRef = doc(firestore, 'diningHalls', selectedDiningHall);
-        const diningHallSnap = await getDoc(diningHallRef);
+      await updateDoc(doc(firestore, 'diningHalls', selectedDiningHall), {
+        occupancy: increment(1),
+      });
 
-        if (diningHallSnap.exists()) {
-            await updateDoc(diningHallRef, {
-                occupancy: increment(1)
-            });
-        } else {
-            await setDoc(diningHallRef, {
-                name: diningHalls.find((hall) => hall.id === selectedDiningHall).name,
-                occupancy: 1,
-            });
-        }
-
-        // Reset selection and show confirmation
-        setSelectedDiningHall('');
-        const friendlyName = diningHalls.find((hall) => hall.id === selectedDiningHall)?.name || 'Unknown Dining Hall';
-        setConfirmationMessage(`Successfully checked into ${friendlyName}!`);
-        } 
-    } catch (e) {
-        // error
-        console.error("Error during check-in:", e);
-        setConfirmationMessage("Failed to report location. Please try again.");
+      setConfirmationMessage(`Successfully checked into ${diningHalls.find(hall => hall.id === selectedDiningHall)?.name}!`);
+      setSelectedDiningHall('');
+    } catch (error) {
+      setErrorMessage('Failed to report location. Please try again.');
     }
   };
 
   return (
-    <Box sx={{
-        backgroundColor: 'background.default',
-        color: 'text.primary',
-        height: '75vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-    }}>
-        <Box sx={{
-        backgroundColor: '#333333',
-        padding: 4,
-        borderRadius: 2,
-        boxShadow: 3,
-        width: 600,
-        textAlign: 'center',
+    <Box sx={{ padding: 4 }}>
+    <Typography variant="h4" gutterBottom>Location Reporting</Typography>
+    <Box sx={{ display: 'flex',  justifyContent: 'center', alignItems: 'center',  minHeight: '50vh', gap: 16 }}>
+      <Paper
+        elevation={3}
+        sx={{
+          padding: 3,
+          width: '100%',
+          maxWidth: 400,
+          textAlign: 'center',
+          borderRadius: 2,
+          backgroundColor: 'background.paper',
         }}
-    >
-        <Typography variant="h4" gutterBottom>Report Your Location</Typography>
-        <Typography variant="body1" sx={{ mb: 4 }}>
-            Select your current dining hall and click the button to check in.
+      >
+        <Typography variant="h5" gutterBottom>
+          Report Your Location
         </Typography>
-        <FormControl fullWidth sx={{ mb: 3 }}>
-            <InputLabel id="dining-hall-label">Dining Hall</InputLabel>
-            <Select
-                labelId="dining-hall-label"
-                id="dining-hall-select"
-                value={selectedDiningHall}
-                onChange={(e) => setSelectedDiningHall(e.target.value)} label="Dining Hall">
-                    {diningHalls.map((hall) => (
-                        <MenuItem key={hall.id} value={hall.id}>
-                            {hall.name}
-                        </MenuItem>
-                    ))}
-                </Select>
+        <FormControl fullWidth sx={{ marginBottom: 2 }}>
+          <InputLabel>Select Dining Hall</InputLabel>
+          <Select
+            value={selectedDiningHall}
+            onChange={(e) => setSelectedDiningHall(e.target.value)}
+            label="Select Dining Hall"
+          >
+            {diningHalls.map((hall) => (
+              <MenuItem key={hall.id} value={hall.id}>
+                {hall.name}
+              </MenuItem>
+            ))}
+          </Select>
         </FormControl>
         <Button
-            variant="contained"
-            color="primary"
-            onClick={handleSubmit}
-            sx={{ mb: 2 }}
-            >
-                Report Location
-            </Button>
-            {confirmationMessage && (
-                <Typography variant="body2" sx={{ mt: 2, color: 'primary'}}>
-                    {confirmationMessage}
-                </Typography>
-            )}
-        </Box>
+          variant="contained"
+          color="primary"
+          fullWidth
+          onClick={handleSubmit}
+          sx={{ marginBottom: 2 }}
+        >
+          Report Location
+        </Button>
+        {confirmationMessage && (
+          <Alert severity="success" sx={{ marginBottom: 2 }}>
+            {confirmationMessage}
+          </Alert>
+        )}
+        {errorMessage && (
+          <Alert severity="error" sx={{ marginBottom: 2 }}>
+            {errorMessage}
+          </Alert>
+        )}
+      </Paper>
+    </Box>
     </Box>
   );
 };
 
 export default LocationReporting;
-
