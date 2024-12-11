@@ -9,7 +9,7 @@ exports.scheduledCheckOut = functions.pubsub.schedule("every 1 hours")
     .onRun(async () => {
       const now = admin.firestore.Timestamp.now();
       const oneHourAgo = new admin.firestore
-          .Timestamp(now.seconds - 3600, now.nanoseconds);
+          .Timestamp(now.seconds - 36, now.nanoseconds);
 
       try {
         // Query locationReports for expired check-ins
@@ -19,7 +19,7 @@ exports.scheduledCheckOut = functions.pubsub.schedule("every 1 hours")
 
         const batch = firestore.batch();
 
-        expiredReports.forEach((doc) => {
+        for (const doc of expiredReports.docs) {
           const diningHallId = doc.data().diningHall;
           const userEmail = doc.data().userEmail;
 
@@ -30,16 +30,28 @@ exports.scheduledCheckOut = functions.pubsub.schedule("every 1 hours")
             occupancy: admin.firestore.FieldValue.increment(-1),
           });
 
-          // Update user's current location to "none"
-          const userRef = firestore.collection("users")
-              .where("email", "==", userEmail);
-          batch.update(userRef, {
-            currentLocation: "none",
+          // Query user by email to get their document
+          const userSnapsot = await firestore.collection("users")
+          .where("email", "==", userEmail)
+          .get();
+
+          userSnapshot.forEach((userDoc) => {
+            const userRef = firestore.collection("users").doc(userDoc.id);
+            batch.update(iserRef, {
+              currentLocation: "none",
+            });
           });
+
+          // Update user's current location to "none"
+          // const userRef = firestore.collection("users")
+          //     .where("email", "==", userEmail);
+          // batch.update(userRef, {
+          //   currentLocation: "none",
+          // });
 
           // Delete the expired check-in
           batch.delete(doc.ref);
-        });
+        }
 
         await batch.commit();
         console.log(`${expiredReports.size} expired check-ins removed.`);
