@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { firestore } from '../firebase';
-import { doc, getDoc, updateDoc, query, collection, where, getDocs, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
-import { Box, TextField, Button, Typography, List, ListItem, ListItemText, Divider } from '@mui/material';
+import {
+  doc, getDoc, updateDoc, query, collection, where,
+  getDocs, arrayUnion, arrayRemove, onSnapshot,
+} from 'firebase/firestore';
+import {
+  Box, TextField, Button, Typography, List,
+  ListItem, ListItemText, Divider, Card, CardContent,
+} from '@mui/material';
 
 const FriendManagement = () => {
   const { currentUser } = useAuth();
@@ -21,155 +27,100 @@ const FriendManagement = () => {
     rothschild: "Rothschild Dining Hall",
     carmichael: "Cafe Carmichael",
     pub: "The Pub at Overcup Oak",
-    blenz: "Vandy Blenz"
+    blenz: "Vandy Blenz",
   };
 
-  // Fetch or subscribe to user data
+  // Subscribe to user data
   useEffect(() => {
     if (currentUser) {
-        const userRef = doc(firestore, 'users', currentUser.uid);
+      const userRef = doc(firestore, 'users', currentUser.uid);
 
-        // Subscribe to changes in the user's friends list
-        const unsubscribe = onSnapshot(userRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                setFriendRequests(data.friendRequests || []);
-                setFriends(data.friends || []); // Ensure this updates only here
-            }
-        });
+      const unsubscribe = onSnapshot(userRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setFriendRequests(data.friendRequests || []);
+          setFriends(data.friends || []);
+        }
+      });
 
-        return () => unsubscribe();
+      return () => unsubscribe();
     }
   }, [currentUser]);
-  
-  // Fetch details for each friend
+
+  // Fetch friend details
   useEffect(() => {
-      const fetchFriendDetails = async () => {
-        const detailsPromises = friends.map(async (friendUid) => {
-          const friendRef = doc(firestore, 'users', friendUid);
-          const friendSnap = await getDoc(friendRef);
-          if (friendSnap.exists()) {
-            return { uid: friendUid, ...friendSnap.data() };
-          } else {
-            console.error(`Friend document does not exist: ${friendUid}`);
-            return null;
-          }
-        });
+    const fetchFriendDetails = async () => {
+      const detailsPromises = friends.map(async (friendUid) => {
+        const friendRef = doc(firestore, 'users', friendUid);
+        const friendSnap = await getDoc(friendRef);
+        if (friendSnap.exists()) {
+          return { uid: friendUid, ...friendSnap.data() };
+        }
+        return null;
+      });
 
-        const details = await Promise.all(detailsPromises);
-        setFriendDetails(details.filter((detail) => detail !== null)); // Filter out nulls
-      };
+      const details = await Promise.all(detailsPromises);
+      setFriendDetails(details.filter((detail) => detail !== null));
+    };
 
-      if (friends.length > 0) {
-        fetchFriendDetails();
-      } else {
-        setFriendDetails([]);
-      }
+    if (friends.length > 0) {
+      fetchFriendDetails();
+    } else {
+      setFriendDetails([]);
+    }
   }, [friends]);
 
-  // search for users by email
   const handleSearch = async () => {
-    // ensure searchInput is a string and trim whitespace
     const sanitizedInput = searchInput.trim();
-    
-    if (!sanitizedInput) {
-      alert('Please enter a valid search input.');
-      return;
-    }
+    if (!sanitizedInput) return;
 
     const usersRef = collection(firestore, 'users');
-    let searchQuery;
-
-    if (sanitizedInput.includes('@')) {
-      // search by email (exact match)
-      searchQuery = query(usersRef, where('email', '==', sanitizedInput));
-    } else {
-      // search by name (partial match, case-insensitive)
-      const lowerCaseInput = sanitizedInput.toLowerCase();
-      searchQuery = query(
-        usersRef,
-        where('name', '==', sanitizedInput));
-        // where('name', '>=', lowerCaseInput), 
-        // where('name', '<', lowerCaseInput + '\uf8ff'));
-    }
+    const searchQuery = sanitizedInput.includes('@')
+      ? query(usersRef, where('email', '==', sanitizedInput))
+      : query(usersRef, where('name', '==', sanitizedInput));
 
     try {
       const querySnapshot = await getDocs(searchQuery);
-
-      if (!querySnapshot.empty) {
-        const results = querySnapshot.docs.map((doc) => ({
-          uid: doc.id,
-          ...doc.data(),
-        }));
-        console.log('Search results:', results);
-        setSearchResults(results);    // save results to state
-      } else {
-
-        setSearchResults([]);         // clear results if nothing found
-      }
+      setSearchResults(querySnapshot.empty ? [] : querySnapshot.docs.map((doc) => ({
+        uid: doc.id,
+        ...doc.data(),
+      })));
     } catch (e) {
       console.error("Error searching users:", e);
-      alert('Failed to search. Please try again.');
-    }
-
-    // const q = query(usersRef, where('email', '==', searchEmail));
-    // const snapshot = await getDocs(q);
-    // if (!snapshot.empty) {
-    //   const user = snapshot.docs[0];
-    //   setSearchResults({uid: user.id, ...user.data() });
-    // } else {
-    //   setSearchResults([]);
-    // }
-  };
-
-  // send a friend request
-  const sendFriendRequest = async (friendId) => {
-    console.log(friendId.uid);
-    if (currentUser) {
-      if (!friendId.uid || typeof friendId.uid !== 'string') {
-        console.error("Invalid recipient UID:", friendId.uid);
-        alert('Invalid recipient information.');
-        return;
-      }
-
-      const friendRequestRef = doc(firestore, 'users', friendId.uid);
-      console.log('Recipient Document Path:', friendRequestRef.path);
-      try {
-        
-        await updateDoc(friendRequestRef, {
-          friendRequests: arrayUnion({
-            from: currentUser.uid,
-            email: currentUser.email,
-            status: 'pending',
-            timestamp: new Date().toISOString(),
-          }),
-        });
-        alert('Friend request sent!');
-      } catch (e) {
-        console.error('Error sending friend request:', e);
-        alert('Request not sent. Please try again.');
-      }
     }
   };
 
-  // accept friend request
+  const sendFriendRequest = async (friend) => {
+    if (!currentUser) return;
+    const friendRef = doc(firestore, 'users', friend.uid);
+
+    try {
+      await updateDoc(friendRef, {
+        friendRequests: arrayUnion({
+          from: currentUser.uid,
+          email: currentUser.email,
+          status: 'pending',
+          timestamp: new Date().toISOString(),
+        }),
+      });
+      alert('Friend request sent!');
+    } catch (e) {
+      console.error('Error sending friend request:', e);
+    }
+  };
+
   const handleAcceptRequest = async (request) => {
     const userRef = doc(firestore, 'users', currentUser.uid);
     const requesterRef = doc(firestore, 'users', request.from);
 
     try {
-      // Add to current user's friends
       await updateDoc(userRef, {
         friends: arrayUnion(request.from),
         friendRequests: arrayRemove(request),
       });
-
-      // Add to requester's friends
       await updateDoc(requesterRef, {
         friends: arrayUnion(currentUser.uid),
       });
-
-      // Update UI
       setFriendRequests((prev) => prev.filter((req) => req.from !== request.from));
       setFriends((prev) => [...prev, request.from]);
     } catch (error) {
@@ -177,15 +128,13 @@ const FriendManagement = () => {
     }
   };
 
-  // deny a friend request
   const handleDenyRequest = async (request) => {
     const userRef = doc(firestore, 'users', currentUser.uid);
+
     try {
       await updateDoc(userRef, {
         friendRequests: arrayRemove(request),
       });
-
-      // Update UI
       setFriendRequests((prev) => prev.filter((req) => req.from !== request.from));
     } catch (error) {
       console.error('Error denying friend request:', error);
@@ -193,81 +142,86 @@ const FriendManagement = () => {
   };
 
   return (
-    <Box sx={{ padding: 4 }}>
-      <Typography variant='h4' gutterBottom>Friends</Typography>
-      <Divider sx={{ my: 2 }}/>
-      <Box sx={{ mb: 4}}>
-        <TextField
-          label="Search by Name or Email"
-          variant="outlined"
-          fullWidth
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
-        <Button onClick={handleSearch} varaint="contained" sx={{ mt: 2}}>Search</Button>
-        {searchResults.length > 0 ? (
-          <Box sx={{ mt: 2 }}>
+    <Box sx={{ padding: 4, backgroundColor: 'background.default' }}>
+      <Typography variant="h4" gutterBottom>Manage Friends</Typography>
+      <Divider sx={{ my: 2 }} />
+
+      <Card sx={{ marginBottom: 4 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>Search Friends</Typography>
+          <TextField
+            label="Search by Name or Email"
+            variant="outlined"
+            fullWidth
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+          <Button
+            variant="contained"
+            sx={{ mt: 2 }}
+            onClick={handleSearch}
+          >
+            Search
+          </Button>
+        </CardContent>
+      </Card>
+
+      {searchResults.length > 0 && (
+        <Card sx={{ marginBottom: 4 }}>
+          <CardContent>
             <Typography variant="h6">Search Results</Typography>
             <List>
               {searchResults.map((result) => (
-                <ListItem key={result.uid} sx={{display: 'flex', justifyContent: 'space-between' }}>
-                  <ListItemText 
-                    primary={result.name || 'No Name'}
-                    secondary={result.email} />
-                  <Button 
-                    onClick={() => sendFriendRequest(result)}
-                    variant="outlined"
-                    sx={{ ml: 2 }}>
-                      Send Friend Request
-                    </Button>
+                <ListItem key={result.uid}>
+                  <ListItemText primary={result.name || 'No Name'} secondary={result.email} />
+                  <Button variant="contained" onClick={() => sendFriendRequest(result)}>Add Friend</Button>
                 </ListItem>
               ))}
             </List>
-            </Box>) : (
-              <Typography variant="body2" sx={{ mt: 2 }}>
-                No results found.
-              </Typography>
-            )}
-            </Box>
-      <Divider sx={{ my: 2}} />
-      <Typography variant="h5">Friend Requests</Typography>
-      <List>
-        {friendRequests.map((request) => (
-          <ListItem key={request.from} sx={{display: 'flex', justifyContent: 'space-between' }}>
-            <ListItemText
-              primary={request.email}
-              secondary={new Date(request.timestamp).toLocaleString()}/>
-          <Box>
-            <Button onClick={() => handleAcceptRequest(request)} variant="contained" sx={{ mr: 1 }}>
-              Accept
-            </Button>
-            <Button onClick={() => handleDenyRequest(request)} variant="outlined" color="error">
-              Deny
-            </Button>
-          </Box>
-          </ListItem>
-        ))}
-        </List>
-        <Divider sx={{ my: 2 }} />
-        <Typography variant="h5">Friends</Typography>
-        <List>
-          {friendDetails.map((friendId) => (
-            <ListItem key={friendId.uid}>
-              <ListItemText 
-                primary={friendId.name || 'Unknown'}
-                secondary={
-                  <div>
-                    <span>Email: {friendId.email}</span>
-                    <br />
-                    <span>Location: {friendId.currentLocation ? diningHallMap[friendId.currentLocation] : "none"}</span>
-                  </div>
-                }/>
-            </ListItem>
-          ))}
-      </List>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card sx={{ marginBottom: 4 }}>
+        <CardContent>
+          <Typography variant="h6">Friend Requests</Typography>
+          <List>
+            {friendRequests.map((request) => (
+              <ListItem key={request.from}>
+                <ListItemText
+                  primary={request.email}
+                  secondary={new Date(request.timestamp).toLocaleString()}
+                />
+                <Button onClick={() => handleAcceptRequest(request)} sx={{ mr: 2 }} variant="contained">Accept</Button>
+                <Button onClick={() => handleDenyRequest(request)} variant="outlined" color="error">Deny</Button>
+              </ListItem>
+            ))}
+          </List>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent>
+          <Typography variant="h6">Your Friends</Typography>
+          <List>
+            {friendDetails.map((friend) => (
+              <ListItem key={friend.uid}>
+                <ListItemText
+                  primary={friend.name || 'Unknown'}
+                  secondary={
+                    <Typography variant="body2">
+                      Email: {friend.email}<br />
+                      Location: {friend.currentLocation ? diningHallMap[friend.currentLocation] : "None"}
+                    </Typography>
+                  }
+                />
+              </ListItem>
+            ))}
+          </List>
+        </CardContent>
+      </Card>
     </Box>
   );
 };
 
 export default FriendManagement;
-
