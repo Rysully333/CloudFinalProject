@@ -18,7 +18,8 @@ const Login = () => {
     e.preventDefault();
     try {
       await login(email, password);
-      history.push('/dashboard');
+      history('/dashboard');
+      console.log('User signed in');
     } catch (error) {
       setError('Failed to log in');
     }
