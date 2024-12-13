@@ -77,7 +77,7 @@ const LocationReporting = () => {
           maxWidth: 400,
           textAlign: 'center',
           borderRadius: 2,
-          backgroundColor: 'background.paper',
+          backgroundColor: '#333333',
         }}
       >
         <Typography variant="h5" gutterBottom>
@@ -91,7 +91,7 @@ const LocationReporting = () => {
             label="Select Dining Hall"
           >
             {diningHalls.map((hall) => (
-              <MenuItem key={hall.id} value={hall.id}>
+              <MenuItem key={hall.id} value={hall.id} sx={{color: '#333333'}}>
                 {hall.name}
               </MenuItem>
             ))}

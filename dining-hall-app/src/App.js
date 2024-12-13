@@ -18,7 +18,7 @@ const theme = createTheme({
       main: '#f5c518', // Gold
     },
     background: {
-      default: '#232323', // Drak gray
+      default: '#232323', // Dark gray
       primary: '#333333'
     },
     text: {

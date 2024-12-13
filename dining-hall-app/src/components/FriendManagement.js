@@ -146,7 +146,7 @@ const FriendManagement = () => {
       <Typography variant="h4" gutterBottom>Manage Friends</Typography>
       <Divider sx={{ my: 2 }} />
 
-      <Card sx={{ marginBottom: 4 }}>
+      <Card sx={{ marginBottom: 4, backgroundColor: '#333333'}}>
         <CardContent>
           <Typography variant="h6" gutterBottom>Search Friends</Typography>
           <TextField
@@ -167,7 +167,7 @@ const FriendManagement = () => {
       </Card>
 
       {searchResults.length > 0 && (
-        <Card sx={{ marginBottom: 4 }}>
+        <Card sx={{ marginBottom: 4, backgroundColor: '#333333' }}>
           <CardContent>
             <Typography variant="h6">Search Results</Typography>
             <List>
@@ -182,7 +182,7 @@ const FriendManagement = () => {
         </Card>
       )}
 
-      <Card sx={{ marginBottom: 4 }}>
+      <Card sx={{ marginBottom: 4, backgroundColor: '#333333'}}>
         <CardContent>
           <Typography variant="h6">Friend Requests</Typography>
           <List>
@@ -200,7 +200,7 @@ const FriendManagement = () => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card sx={{backgroundColor: '#333333'}}>
         <CardContent>
           <Typography variant="h6">Your Friends</Typography>
           <List>
